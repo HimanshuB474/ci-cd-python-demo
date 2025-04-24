@@ -1,0 +1,40 @@
+pipeline {
+    agent any
+    environment {
+        ART_USER = credentials('artifactory-user')
+        ART_PASS = credentials('artifactory-pass')
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/YOUR_USERNAME/ci-cd-python-demo.git'
+            }
+        }
+        stage('Install Dependencies') {
+            steps {
+                sh 'pip install -r requirements.txt'
+            }
+        }
+        stage('Run Tests') {
+            steps {
+                sh 'pytest tests --junitxml=report.xml'
+            }
+        }
+        stage('Build Package') {
+            steps {
+                sh 'python setup.py sdist bdist_wheel'
+            }
+        }
+        stage('Publish to Artifactory') {
+            steps {
+                sh 'curl -u$ART_USER:$ART_PASS -T dist/*.whl https://your-org.jfrog.io/artifactory/python-local/'
+            }
+        }
+    }
+    post {
+        always {
+            junit 'report.xml'
+        }
+    }
+}
+
