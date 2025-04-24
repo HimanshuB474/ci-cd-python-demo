@@ -1,40 +1,141 @@
 pipeline {
     agent any
+    
     environment {
-        ART_USER = credentials('artifactory-user')
-        ART_PASS = credentials('artifactory-pass')
+        // Use a single credentials object for better security
+        ARTIFACTORY_CREDS = credentials('artifactory-credentials')
+        // Make Python commands configurable
+        PYTHON = 'python3'
+        PIP = 'pip3'
     }
+    
+    options {
+        timeout(time: 30, unit: 'MINUTES')  // Prevent hanging builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))  // Limit build history
+    }
+    
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/YOUR_USERNAME/ci-cd-python-demo.git'
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: 'main']],
+                    extensions: [[$class: 'CleanBeforeCheckout']],  // Clean workspace first
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/HimanshuB474/ci-cd-python-demo.git',
+                        credentialsId: 'github-credentials'  // Create this in Jenkins
+                    ]]
+                ])
+                // Verify checkout
+                sh 'git branch -a'
+                sh 'ls -la'
             }
         }
+        
+        stage('Setup Environment') {
+            steps {
+                sh '${PYTHON} --version'
+                sh '${PIP} --version'
+                sh '${PIP} install --upgrade pip setuptools wheel'
+            }
+        }
+        
         stage('Install Dependencies') {
             steps {
-                sh 'pip install -r requirements.txt'
+                script {
+                    if (fileExists('requirements.txt')) {
+                        sh '${PIP} install -r requirements.txt'
+                    } else {
+                        error 'requirements.txt not found!'
+                    }
+                }
             }
         }
+        
         stage('Run Tests') {
             steps {
-                sh 'pytest tests --junitxml=report.xml'
+                script {
+                    try {
+                        sh '${PYTHON} -m pytest tests/ --junitxml=report.xml --cov=src/ --cov-report=xml'
+                    } catch (Exception e) {
+                        echo "Tests failed: ${e}"
+                        // Continue to publish test results even if tests fail
+                        sh '${PYTHON} -m pytest tests/ --junitxml=report.xml || true'
+                        error('Tests failed')  // Optional: Fail the build on test failures
+                    }
+                }
+            }
+            post {
+                always {
+                    junit 'report.xml'  // Publish test results
+                    // Publish coverage if you have the plugin
+                    publishCoverage adapters: [coberturaAdapter('coverage.xml')]
+                }
             }
         }
+        
         stage('Build Package') {
             steps {
-                sh 'python setup.py sdist bdist_wheel'
+                script {
+                    if (fileExists('setup.py')) {
+                        sh '${PYTHON} setup.py sdist bdist_wheel'
+                        archiveArtifacts artifacts: 'dist/*.whl', fingerprint: true
+                    } else {
+                        error 'setup.py not found - cannot build package'
+                    }
+                }
             }
         }
+        
         stage('Publish to Artifactory') {
+            when {
+                branch 'main'  // Only publish from main branch
+            }
             steps {
-                sh 'curl -u$ART_USER:$ART_PASS -T dist/*.whl https://your-org.jfrog.io/artifactory/python-local/'
+                script {
+                    def files = findFiles(glob: 'dist/*.whl')
+                    if (files) {
+                        withCredentials([usernamePassword(
+                            credentialsId: 'artifactory-credentials',
+                            usernameVariable: 'ART_USER',
+                            passwordVariable: 'ART_PASS'
+                        )]) {
+                            sh '''
+                                for wheel in dist/*.whl; do
+                                    echo "Uploading ${wheel}"
+                                    curl -f -u${ART_USER}:${ART_PASS} -T "${wheel}" \
+                                    "https://your-org.jfrog.io/artifactory/python-local/" || \
+                                    echo "Failed to upload ${wheel}"
+                                done
+                            '''
+                        }
+                    } else {
+                        error 'No wheel files found to publish'
+                    }
+                }
             }
         }
     }
+    
     post {
         always {
-            junit 'report.xml'
+            echo "Build completed with status: ${currentBuild.currentResult}"
+            cleanWs()  // Clean up workspace
+        }
+        success {
+            slackSend(color: 'good', message: "SUCCESS: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)")
+        }
+        failure {
+            slackSend(color: 'danger', message: "FAILED: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)")
+            emailext body: '''Check console output at ${BUILD_URL}
+            
+            Failed stage: ${STAGE_NAME}
+            Error: ${BUILD_LOG_REGEX, regex="ERROR:.*", linesBefore=5, linesAfter=5}''',
+            subject: 'FAILED: ${JOB_NAME} #${BUILD_NUMBER}',
+            to: 'dev-team@example.com'
+        }
+        unstable {
+            slackSend(color: 'warning', message: "UNSTABLE: ${env.JOB_NAME} ${env.BUILD_NUMBER} (Tests failed)")
         }
     }
 }
-
