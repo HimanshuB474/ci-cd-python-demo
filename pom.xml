@@ -13,7 +13,7 @@
     <name>ci-cd-python-demo</name>
 
     <properties>
-        <python.version>python</python.version> <!-- CHANGED HERE -->
+        <python.version>C:\Users\himan\AppData\Local\Programs\Python\Python311\python.exe</python.version> <!-- Updated Python path -->
     </properties>
 
     <build>
