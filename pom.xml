@@ -7,35 +7,47 @@
     <groupId>com.example</groupId>
     <artifactId>ci-cd-python-demo</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <packaging>jar</packaging> <!-- This can stay as jar or change to something else if you want -->
+    <packaging>jar</packaging>
 
     <name>ci-cd-python-demo</name>
 
     <properties>
-        <!-- Define Python version for Maven plugin -->
-        <python.version>3.8</python.version>
+        <python.version>python3</python.version> <!-- Better to keep as python3 -->
     </properties>
 
     <dependencies>
-        <!-- Add any Java dependencies if required -->
-        <!-- Example for logging -->
-        <!-- <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>1.7.30</version>
-        </dependency> -->
+        <!-- (Optional) Add Java dependencies if needed -->
     </dependencies>
 
     <build>
         <plugins>
-            <!-- Maven Exec Plugin to run Python commands -->
+            <!-- Plugin to install Python dependencies -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.0.0</version>
                 <executions>
-                    <!-- Running pytest -->
                     <execution>
+                        <id>pip-install</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${python.version}</executable>
+                            <arguments>
+                                <argument>-m</argument>
+                                <argument>pip</argument>
+                                <argument>install</argument>
+                                <argument>-r</argument>
+                                <argument>requirements.txt</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>run-tests</id>
+                        <phase>test</phase>
                         <goals>
                             <goal>exec</goal>
                         </goals>
@@ -51,56 +63,6 @@
                     </execution>
                 </executions>
             </plugin>
-
-            <!-- Maven Dependency Plugin to install Python dependencies -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>copy</goal>
-                        </goals>
-                        <configuration>
-                            <artifactItems>
-                                <!-- Copy requirements.txt to the right place -->
-                                <artifactItem>
-                                    <groupId>com.example</groupId>
-                                    <artifactId>requirements</artifactId>
-                                    <version>1.0</version>
-                                    <type>txt</type>
-                                    <outputDirectory>${project.build.directory}</outputDirectory>
-                                </artifactItem>
-                            </artifactItems>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Maven Install Plugin to run pip install -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.0.0</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <executable>${python.version}</executable>
-                            <arguments>
-                                <argument>-m</argument>
-                                <argument>pip</argument>
-                                <argument>install</argument>
-                                <argument>-r</argument>
-                                <argument>requirements.txt</argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
 
@@ -108,7 +70,6 @@
         <profile>
             <id>python</id>
             <properties>
-                <!-- You can specify additional properties for the Python environment here -->
                 <python.home>/usr/bin/python</python.home>
             </properties>
         </profile>
