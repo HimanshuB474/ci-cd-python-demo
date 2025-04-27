@@ -25,17 +25,17 @@ pipeline {
                     ]]
                 ])
                 sh 'git branch -a'
-                sh 'ls -la'
+                sh 'ls -la'  // List files in the root directory to verify checkout
             }
         }
 
         stage('Build with Maven') {
             steps {
                 script {
-                    // Navigate to the directory where pom.xml is located
+                    // Navigate to the directory where the pom.xml file is located
                     dir('ci-cd-python-demo') {
                         // Ensure pom.xml is in the current directory
-                        sh 'ls -la'  // Check if pom.xml is here
+                        sh 'ls -la'  // List files in the `ci-cd-python-demo` directory to verify pom.xml exists
                         sh 'mvn clean install'  // Run Maven build
                     }
                 }
