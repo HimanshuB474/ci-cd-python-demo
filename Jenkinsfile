@@ -2,9 +2,7 @@ pipeline {
     agent any
 
     environment {
-        ARTIFACTORY_CREDS = credentials('artifactory-credentials')
-        PYTHON = 'python3'
-        PIP = 'pip3'
+        PYTHON = 'python'
     }
 
     options {
@@ -17,20 +15,19 @@ pipeline {
             steps {
                 checkout([
                     $class: 'GitSCM',
-                    branches: [[name: 'main']],
-                    extensions: [[$class: 'CleanBeforeCheckout']],
+                    branches: [[name: '*/main']],
                     userRemoteConfigs: [[
                         url: 'https://github.com/HimanshuB474/ci-cd-python-demo.git',
                         credentialsId: 'github-credentials'
                     ]]
                 ])
-                sh 'ls -la' // (optional) list files to verify
+                bat 'dir' // Windows uses 'dir', not 'ls -la'
             }
         }
 
-        stage('Build with Maven') {
+        stage('Build and Test') {
             steps {
-                sh 'mvn clean install'  // 👈 Now, directly run Maven from root!
+                bat 'mvn clean install'
             }
         }
     }
@@ -44,14 +41,14 @@ pipeline {
         }
         failure {
             slackSend(color: 'danger', message: "FAILED: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)")
-            emailext body: '''
-                Check console output at ${BUILD_URL}
+            emailext(
+                body: '''Check console output at ${BUILD_URL}
                 
                 Failed stage: ${STAGE_NAME}
-                Error: ${BUILD_LOG_REGEX, regex="ERROR:.*", linesBefore=5, linesAfter=5}
-            ''',
-            subject: 'FAILED: ${JOB_NAME} #${BUILD_NUMBER}',
-            to: 'dev-team@example.com'
+                Error: ${BUILD_LOG_REGEX, regex="ERROR:.*", linesBefore=5, linesAfter=5}''',
+                subject: 'FAILED: ${JOB_NAME} #${BUILD_NUMBER}',
+                to: 'dev-team@example.com'
+            )
         }
     }
 }

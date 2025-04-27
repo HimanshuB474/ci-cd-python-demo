@@ -2,6 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.example</groupId>
@@ -12,12 +13,8 @@
     <name>ci-cd-python-demo</name>
 
     <properties>
-        <python.version>python3</python.version> <!-- Better to keep as python3 -->
+        <python.version>python</python.version> <!-- <-- CHANGED HERE -->
     </properties>
-
-    <dependencies>
-        <!-- (Optional) Add Java dependencies if needed -->
-    </dependencies>
 
     <build>
         <plugins>
@@ -29,10 +26,8 @@
                 <executions>
                     <execution>
                         <id>pip-install</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
+                        <phase>validate</phase>
+                        <goals><goal>exec</goal></goals>
                         <configuration>
                             <executable>${python.version}</executable>
                             <arguments>
@@ -45,12 +40,11 @@
                         </configuration>
                     </execution>
 
+                    <!-- Plugin to run pytest -->
                     <execution>
-                        <id>run-tests</id>
+                        <id>run-pytest</id>
                         <phase>test</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
+                        <goals><goal>exec</goal></goals>
                         <configuration>
                             <executable>${python.version}</executable>
                             <arguments>
@@ -61,17 +55,10 @@
                             </arguments>
                         </configuration>
                     </execution>
+
                 </executions>
             </plugin>
         </plugins>
     </build>
 
-    <profiles>
-        <profile>
-            <id>python</id>
-            <properties>
-                <python.home>/usr/bin/python</python.home>
-            </properties>
-        </profile>
-    </profiles>
 </project>
