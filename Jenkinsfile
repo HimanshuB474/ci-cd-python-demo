@@ -24,22 +24,15 @@ pipeline {
                         credentialsId: 'github-credentials'
                     ]]
                 ])
-                sh 'git branch -a'
-                sh 'ls -la' // List files to verify checkout
+                sh 'ls -la' // (optional) list files to verify
             }
         }
 
         stage('Build with Maven') {
             steps {
-                script {
-                    sh 'echo "Checking files in Jenkins workspace..."'
-                    sh 'ls -la'  // Confirm pom.xml is present
-                    sh 'mvn clean install'  // Run Maven directly
-                }
+                sh 'mvn clean install'  // 👈 Now, directly run Maven from root!
             }
         }
-
-        // You can add testing, deployment stages here if needed
     }
 
     post {
