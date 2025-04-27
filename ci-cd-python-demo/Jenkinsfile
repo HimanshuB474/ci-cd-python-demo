@@ -2,6 +2,7 @@ pipeline {
     agent any
     
     environment {
+        ARTIFACTORY_CREDS = credentials('artifactory-credentials')
         PYTHON = 'python3'
         PIP = 'pip3'
     }
@@ -27,93 +28,25 @@ pipeline {
                 sh 'ls -la'
             }
         }
-        
-        stage('Setup Environment') {
-            steps {
-                sh '${PYTHON} --version'
-                sh '${PIP} --version'
-                sh '${PIP} install --upgrade pip setuptools wheel'
-            }
-        }
-        
-        stage('Install Dependencies') {
+
+        stage('Build with Maven') {
             steps {
                 script {
-                    if (fileExists('requirements.txt')) {
-                        sh '${PIP} install -r requirements.txt'
-                    } else {
-                        error 'requirements.txt not found!'
+                    // Navigate to the directory where pom.xml is located
+                    dir('ci-cd-python-demo') {
+                        // Ensure pom.xml is in the current directory
+                        sh 'ls -la'  // Check if pom.xml is here
+                        sh 'mvn clean install'  // Run Maven build
                     }
                 }
             }
         }
-        
-        stage('Run Tests') {
-            steps {
-                script {
-                    try {
-                        sh '${PYTHON} -m pytest tests/ --junitxml=report.xml --cov=src/ --cov-report=xml'
-                    } catch (Exception e) {
-                        echo "Tests failed: ${e}"
-                        sh '${PYTHON} -m pytest tests/ --junitxml=report.xml || true'
-                        error('Tests failed')
-                    }
-                }
-            }
-            post {
-                always {
-                    junit 'report.xml'
-                    publishCoverage adapters: [coberturaAdapter('coverage.xml')]
-                }
-            }
-        }
-        
-        stage('Package Project') {
-            steps {
-                script {
-                    if (fileExists('setup.py')) {
-                        sh '${PYTHON} setup.py sdist bdist_wheel'
-                        archiveArtifacts artifacts: 'dist/*.whl', fingerprint: true
-                    } else {
-                        error 'setup.py not found - cannot build package'
-                    }
-                }
-            }
-        }
-        
-        stage('Publish to Artifactory') {
-            when {
-                branch 'main'
-            }
-            steps {
-                script {
-                    def files = findFiles(glob: 'dist/*.whl')
-                    if (files) {
-                        withCredentials([usernamePassword(
-                            credentialsId: 'artifactory-credentials',
-                            usernameVariable: 'ART_USER',
-                            passwordVariable: 'ART_PASS'
-                        )]) {
-                            sh '''
-                                for wheel in dist/*.whl; do
-                                    echo "Uploading ${wheel}"
-                                    curl -f -u${ART_USER}:${ART_PASS} -T "${wheel}" \
-                                    "https://your-org.jfrog.io/artifactory/python-local/" || \
-                                    echo "Failed to upload ${wheel}"
-                                done
-                            '''
-                        }
-                    } else {
-                        error 'No wheel files found to publish'
-                    }
-                }
-            }
-        }
+
+        // Other stages (e.g., test, deploy) can go here
     }
     
     post {
         always {
-            echo "Build completed with status: ${currentBuild.currentResult}"
             cleanWs()
         }
         success {
@@ -127,9 +60,6 @@ pipeline {
             Error: ${BUILD_LOG_REGEX, regex="ERROR:.*", linesBefore=5, linesAfter=5}''',
             subject: 'FAILED: ${JOB_NAME} #${BUILD_NUMBER}',
             to: 'dev-team@example.com'
-        }
-        unstable {
-            slackSend(color: 'warning', message: "UNSTABLE: ${env.JOB_NAME} ${env.BUILD_NUMBER} (Tests failed)")
         }
     }
 }
