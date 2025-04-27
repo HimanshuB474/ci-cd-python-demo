@@ -1,17 +1,17 @@
 pipeline {
     agent any
-    
+
     environment {
         ARTIFACTORY_CREDS = credentials('artifactory-credentials')
         PYTHON = 'python3'
         PIP = 'pip3'
     }
-    
+
     options {
         timeout(time: 30, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
-    
+
     stages {
         stage('Checkout') {
             steps {
@@ -25,26 +25,23 @@ pipeline {
                     ]]
                 ])
                 sh 'git branch -a'
-                sh 'ls -la'  // List files in the root directory to verify checkout
+                sh 'ls -la' // List files to verify checkout
             }
         }
 
         stage('Build with Maven') {
             steps {
                 script {
-                    // Navigate to the directory where the pom.xml file is located
-                    dir('ci-cd-python-demo') {
-                        // Ensure pom.xml is in the current directory
-                        sh 'ls -la'  // List files in the `ci-cd-python-demo` directory to verify pom.xml exists
-                        sh 'mvn clean install'  // Run Maven build
-                    }
+                    sh 'echo "Checking files in Jenkins workspace..."'
+                    sh 'ls -la'  // Confirm pom.xml is present
+                    sh 'mvn clean install'  // Run Maven directly
                 }
             }
         }
 
-        // Other stages (e.g., test, deploy) can go here
+        // You can add testing, deployment stages here if needed
     }
-    
+
     post {
         always {
             cleanWs()
@@ -54,10 +51,12 @@ pipeline {
         }
         failure {
             slackSend(color: 'danger', message: "FAILED: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)")
-            emailext body: '''Check console output at ${BUILD_URL}
-            
-            Failed stage: ${STAGE_NAME}
-            Error: ${BUILD_LOG_REGEX, regex="ERROR:.*", linesBefore=5, linesAfter=5}''',
+            emailext body: '''
+                Check console output at ${BUILD_URL}
+                
+                Failed stage: ${STAGE_NAME}
+                Error: ${BUILD_LOG_REGEX, regex="ERROR:.*", linesBefore=5, linesAfter=5}
+            ''',
             subject: 'FAILED: ${JOB_NAME} #${BUILD_NUMBER}',
             to: 'dev-team@example.com'
         }
