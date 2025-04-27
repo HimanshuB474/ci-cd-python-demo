@@ -2,16 +2,13 @@ pipeline {
     agent any
     
     environment {
-        // Use a single credentials object for better security
-        ARTIFACTORY_CREDS = credentials('artifactory-credentials')
-        // Make Python commands configurable
         PYTHON = 'python3'
         PIP = 'pip3'
     }
     
     options {
-        timeout(time: 30, unit: 'MINUTES')  // Prevent hanging builds
-        buildDiscarder(logRotator(numToKeepStr: '10'))  // Limit build history
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
     }
     
     stages {
@@ -20,13 +17,12 @@ pipeline {
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: 'main']],
-                    extensions: [[$class: 'CleanBeforeCheckout']],  // Clean workspace first
+                    extensions: [[$class: 'CleanBeforeCheckout']],
                     userRemoteConfigs: [[
                         url: 'https://github.com/HimanshuB474/ci-cd-python-demo.git',
-                        credentialsId: 'github-credentials'  // Create this in Jenkins
+                        credentialsId: 'github-credentials'
                     ]]
                 ])
-                // Verify checkout
                 sh 'git branch -a'
                 sh 'ls -la'
             }
@@ -59,22 +55,20 @@ pipeline {
                         sh '${PYTHON} -m pytest tests/ --junitxml=report.xml --cov=src/ --cov-report=xml'
                     } catch (Exception e) {
                         echo "Tests failed: ${e}"
-                        // Continue to publish test results even if tests fail
                         sh '${PYTHON} -m pytest tests/ --junitxml=report.xml || true'
-                        error('Tests failed')  // Optional: Fail the build on test failures
+                        error('Tests failed')
                     }
                 }
             }
             post {
                 always {
-                    junit 'report.xml'  // Publish test results
-                    // Publish coverage if you have the plugin
+                    junit 'report.xml'
                     publishCoverage adapters: [coberturaAdapter('coverage.xml')]
                 }
             }
         }
         
-        stage('Build Package') {
+        stage('Package Project') {
             steps {
                 script {
                     if (fileExists('setup.py')) {
@@ -89,7 +83,7 @@ pipeline {
         
         stage('Publish to Artifactory') {
             when {
-                branch 'main'  // Only publish from main branch
+                branch 'main'
             }
             steps {
                 script {
@@ -120,7 +114,7 @@ pipeline {
     post {
         always {
             echo "Build completed with status: ${currentBuild.currentResult}"
-            cleanWs()  // Clean up workspace
+            cleanWs()
         }
         success {
             slackSend(color: 'good', message: "SUCCESS: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)")
